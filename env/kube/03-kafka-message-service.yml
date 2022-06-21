@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-message-service
+  namespace: dev-kafka-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-message-service
+  revisionHistoryLimit: 10
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: kafka-message-service
+    spec:
+      nodeSelector:
+        rfpool: lab
+      containers:
+        - name: kafka-message-service
+          image: ftidevacr.azurecr.io/wonder-lab/kafka-message-service:latest
+          env:
+            - name: JAVA_OPTS
+              value: "-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:MaxMetaspaceSize=128m -Xss256k -XX:G1PeriodicGCInterval=900k"
+          readinessProbe:
+            httpGet:
+              path: /health-check
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 200m
+              memory: 500Mi
+            limits:
+              cpu: 1000m
+              memory: 500Mi

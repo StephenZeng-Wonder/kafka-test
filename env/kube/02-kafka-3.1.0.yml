@@ -1,0 +1,150 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zookeeper
+  namespace: dev-kafka-test
+spec:
+  serviceName: zookeeper
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  updateStrategy:
+    type: OnDelete
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      nodeSelector:
+        rfpool: lab
+      containers:
+        - name: zookeeper
+          image: zookeeper:3.5.9
+          env:
+            - name: JMXDISABLE
+              value: "true"
+            - name: ZOO_DATA_DIR
+              value: "/data"
+            - name: ZOO_DATA_LOG_DIR
+              value: "/datalog"
+            - name: ZOO_ADMINSERVER_ENABLED
+              value: "false"
+            - name: ZOO_AUTOPURGE_PURGEINTERVAL
+              value: "24"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: datalog
+              mountPath: /datalog
+          resources:
+            limits:
+              memory: 256Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+    - metadata:
+        name: datalog
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  namespace: dev-kafka-test
+spec:
+  clusterIP: None
+  ports:
+    - port: 2181
+  selector:
+    app: zookeeper
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: dev-kafka-test
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  updateStrategy:
+    type: OnDelete
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      nodeSelector:
+        rfpool: lab
+      initContainers:
+        - name: agent
+          image: ftidevacr.azurecr.io/ops/jmx-exporter-agent:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: exporter-agent
+              mountPath: /exporter-agent
+      containers:
+        - name: kafka
+          env:
+            - name: KAFKA_JMX_OPTS
+              value: "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.port=1099 -Dcom.sun.management.jmxremote.rmi.port=1099"
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms1G -Xmx1G"
+            - name: KAFKA_ARGS
+              value: "--override zookeeper.connect=zookeeper-0.zookeeper:2181 --override log.retention.bytes=45000000000 --override log.retention.hours=168"
+            - name: KAFKA_OPTS
+              value: "-javaagent:/exporter-agent/jmx-exporter-agent.jar=12345:/exporter-agent/config.yaml"
+          image: neowu/kafka:3.1.0
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: exporter-agent
+              mountPath: /exporter-agent
+          resources:
+            requests:
+              memory: 2Gi
+              cpu: 1
+            limits:
+              memory: 3Gi
+              cpu: 2
+      volumes:
+        - emptyDir: { }
+          name: exporter-agent
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 100Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: dev-kafka-test
+spec:
+  clusterIP: None
+  ports:
+    - port: 9092
+  selector:
+    app: kafka
+
