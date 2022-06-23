@@ -1,6 +1,22 @@
 # kafka-test
 core-ng kafka version compatibility test
 
+# 2022-06-23 update
+
+### add 3.1.0 kafka
+
+```
+kubectl apply -f 04-kafka-3.1.0.yml
+```
+connect to kafka version 3.1.0 please use service
+```
+sys.kafka.uri=kafka-v3:9092
+```
+connect to kafka that do downtime upgrade use service
+```
+sys.kafka.uri=kafka:9092
+```
+
 # test steps
 
 ### check out repo
@@ -19,9 +35,9 @@ git clone git@github.com:StephenZeng-Wonder/kafka-test.git
 ### deploy kube resource
 
 ```
-kubectl apply 00-namespace.yml
-kubectl apply 01-kafka-2.8.0.yml
-kubectl apply 03-kafka-message-service.yml
+kubectl apply -f 00-namespace.yml
+kubectl apply -f 01-kafka-2.8.0.yml
+kubectl apply -f 03-kafka-message-service.yml
 ```
 
 ### check service produce/consume kafka message normal
@@ -31,7 +47,7 @@ check pod logs in lens
 ### deploy new version kafka
 
 ```
-kubectl apply 02-kafka-3.1.0.yml
+kubectl apply -f 02-kafka-3.1.0.yml
 ```
 
 delete kafka old pod
